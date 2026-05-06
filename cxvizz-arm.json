@@ -1,0 +1,228 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerAppName": {
+      "type": "string",
+      "defaultValue": "cxvizz",
+      "metadata": {
+        "description": "Name of the Azure Container App."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for deployment."
+      }
+    },
+    "managedEnvironmentResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of an existing Azure Container Apps Environment."
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "docker.kervexperience.net/cxvizz2:latest",
+      "metadata": {
+        "description": "Container image including tag."
+      }
+    },
+    "registryServer": {
+      "type": "string",
+      "defaultValue": "docker.kervexperience.net",
+      "metadata": {
+        "description": "Private container registry server."
+      }
+    },
+    "registryUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Private container registry username."
+      }
+    },
+    "registryPassword": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Private container registry password."
+      }
+    },
+    "storage": {
+      "type": "string",
+      "defaultValue": "mssql",
+      "metadata": {
+        "description": "Storage type used by CXVizz."
+      }
+    },
+    "baseUrl": {
+      "type": "string",
+      "defaultValue": "https://api.euw2.pure.cloud",
+      "metadata": {
+        "description": "Genesys API base URL."
+      }
+    },
+    "clientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Genesys OAuth client ID."
+      }
+    },
+    "genesysSecret": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Genesys OAuth client secret."
+      }
+    },
+    "databaseConnectionString": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Primary database connection string."
+      }
+    },
+    "dynamicDatabaseConnectionString": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Dynamic database connection string."
+      }
+    },
+    "name": {
+      "type": "string",
+      "defaultValue": "kerv-genesys",
+      "metadata": {
+        "description": "Organisation name for diagnostics."
+      }
+    },
+    "startDate": {
+      "type": "string",
+      "defaultValue": "2024-01-01",
+      "metadata": {
+        "description": "Earliest date used for data extraction."
+      }
+    },
+    "cpu": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "metadata": {
+        "description": "Container CPU allocation."
+      }
+    },
+    "memory": {
+      "type": "string",
+      "defaultValue": "2Gi",
+      "metadata": {
+        "description": "Container memory allocation (for example 2Gi)."
+      }
+    },
+    "minReplicas": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 0,
+      "metadata": {
+        "description": "Minimum replica count."
+      }
+    },
+    "maxReplicas": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "metadata": {
+        "description": "Maximum replica count."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('containerAppName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "managedEnvironmentId": "[parameters('managedEnvironmentResourceId')]",
+        "configuration": {
+          "activeRevisionsMode": "Single",
+          "secrets": [
+            {
+              "name": "registry-password",
+              "value": "[parameters('registryPassword')]"
+            },
+            {
+              "name": "genesys-secret",
+              "value": "[parameters('genesysSecret')]"
+            },
+            {
+              "name": "sql-param",
+              "value": "[parameters('databaseConnectionString')]"
+            },
+            {
+              "name": "dynamic-sql-param",
+              "value": "[parameters('dynamicDatabaseConnectionString')]"
+            }
+          ],
+          "registries": [
+            {
+              "server": "[parameters('registryServer')]",
+              "username": "[parameters('registryUsername')]",
+              "passwordSecretRef": "registry-password"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "cxvizz",
+              "image": "[parameters('containerImage')]",
+              "resources": {
+                "cpu": "[parameters('cpu')]",
+                "memory": "[parameters('memory')]"
+              },
+              "env": [
+                {
+                  "name": "STORAGE",
+                  "value": "[parameters('storage')]"
+                },
+                {
+                  "name": "BASE_URL",
+                  "value": "[parameters('baseUrl')]"
+                },
+                {
+                  "name": "CLIENT_ID",
+                  "value": "[parameters('clientId')]"
+                },
+                {
+                  "name": "CXVIZZ_PURPOSE",
+                  "value": "genesys"
+                },
+                {
+                  "name": "SECRET",
+                  "secretRef": "genesys-secret"
+                },
+                {
+                  "name": "SQL_PARAM",
+                  "secretRef": "sql-param"
+                },
+                {
+                  "name": "DYNAMIC_SQL_PARAM",
+                  "secretRef": "dynamic-sql-param"
+                },
+                {
+                  "name": "NAME",
+                  "value": "[parameters('name')]"
+                },
+                {
+                  "name": "START_DATE",
+                  "value": "[parameters('startDate')]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": "[parameters('minReplicas')]",
+            "maxReplicas": "[parameters('maxReplicas')]"
+          }
+        }
+      }
+    }
+  ]
+}
